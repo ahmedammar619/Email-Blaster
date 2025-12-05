@@ -10,6 +10,7 @@ const contactRoutes = require('./routes/contacts');
 const emailRoutes = require('./routes/emails');
 const templateRoutes = require('./routes/templates');
 const emailAccountRoutes = require('./routes/emailAccounts');
+const emailSettingsRoutes = require('./routes/emailSettings');
 
 const start = async () => {
   try {
@@ -34,6 +35,7 @@ const start = async () => {
     await fastify.register(emailRoutes, { prefix: '/api/emails' });
     await fastify.register(templateRoutes, { prefix: '/api/templates' });
     await fastify.register(emailAccountRoutes, { prefix: '/api/email-accounts' });
+    await fastify.register(emailSettingsRoutes, { prefix: '/api/email-settings' });
 
     // Health check
     fastify.get('/api/health', async () => {

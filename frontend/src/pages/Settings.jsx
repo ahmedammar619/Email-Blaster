@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Send, Plus, Trash2, Edit2, Star } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { CheckCircle, XCircle, Send, Plus, Trash2, Edit2, Star, RotateCcw, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { emailApi, healthCheck, emailAccountApi } from '../services/api';
+import { emailApi, healthCheck, emailAccountApi, emailSettingsApi } from '../services/api';
 
 export default function Settings() {
   const [apiStatus, setApiStatus] = useState(null);
@@ -25,8 +25,18 @@ export default function Settings() {
     is_default: false,
   });
 
+  // Email Header/Footer Settings
+  const [emailHeader, setEmailHeader] = useState('');
+  const [emailFooter, setEmailFooter] = useState('');
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [showHeaderFooterPreview, setShowHeaderFooterPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const previewIframeRef = useRef(null);
+
   useEffect(() => {
     loadAccounts();
+    loadEmailSettings();
   }, []);
 
   const loadAccounts = async () => {
@@ -37,6 +47,56 @@ export default function Settings() {
       console.error('Failed to load email accounts');
     } finally {
       setLoadingAccounts(false);
+    }
+  };
+
+  const loadEmailSettings = async () => {
+    try {
+      const res = await emailSettingsApi.getAll();
+      setEmailHeader(res.data.email_header || '');
+      setEmailFooter(res.data.email_footer || '');
+    } catch (error) {
+      console.error('Failed to load email settings');
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  const saveEmailSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await emailSettingsApi.updateMultiple({
+        email_header: emailHeader,
+        email_footer: emailFooter,
+      });
+      toast.success('Email header/footer saved');
+    } catch (error) {
+      toast.error('Failed to save email settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const resetEmailSettings = async () => {
+    if (!confirm('Are you sure you want to reset header/footer to defaults?')) return;
+    try {
+      const res = await emailSettingsApi.reset();
+      setEmailHeader(res.data.email_header);
+      setEmailFooter(res.data.email_footer);
+      toast.success('Reset to defaults');
+    } catch (error) {
+      toast.error('Failed to reset settings');
+    }
+  };
+
+  const previewHeaderFooter = async () => {
+    try {
+      const sampleBody = '<p>This is a sample email body content. It will be wrapped with your header and footer.</p>';
+      const res = await emailSettingsApi.preview(sampleBody, true);
+      setPreviewHtml(res.data.html);
+      setShowHeaderFooterPreview(true);
+    } catch (error) {
+      toast.error('Failed to generate preview');
     }
   };
 
@@ -265,6 +325,80 @@ export default function Settings() {
           )}
         </div>
 
+        {/* Email Header/Footer Settings */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Email Header & Footer</h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={previewHeaderFooter}
+                className="flex items-center px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                Preview
+              </button>
+              <button
+                onClick={resetEmailSettings}
+                className="flex items-center px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Reset
+              </button>
+              <button
+                onClick={saveEmailSettings}
+                disabled={savingSettings}
+                className="flex items-center px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {savingSettings ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-600 mb-4">
+            Configure the default HTML header and footer that wraps all your email templates.
+          </p>
+
+          {loadingSettings ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Header (HTML)
+                </label>
+                <textarea
+                  value={emailHeader}
+                  onChange={(e) => setEmailHeader(e.target.value)}
+                  rows={8}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                  placeholder="<!DOCTYPE html><html>..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Include opening HTML tags, styles, and header content
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Footer (HTML)
+                </label>
+                <textarea
+                  value={emailFooter}
+                  onChange={(e) => setEmailFooter(e.target.value)}
+                  rows={6}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                  placeholder="</div></body></html>"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Include closing tags, footer content, and unsubscribe links
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Connection Status */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">System Status</h2>
@@ -474,6 +608,35 @@ export default function Settings() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Header/Footer Preview Modal */}
+      {showHeaderFooterPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <h2 className="text-xl font-bold mb-4">Email Preview</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              This is how your emails will look with the current header and footer.
+            </p>
+            <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
+              <iframe
+                ref={previewIframeRef}
+                srcDoc={previewHtml}
+                className="w-full h-96 bg-white"
+                title="Email Preview"
+                sandbox="allow-same-origin"
+              />
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setShowHeaderFooterPreview(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

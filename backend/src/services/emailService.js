@@ -56,6 +56,30 @@ class EmailService {
     return result;
   }
 
+  async getHeaderFooter(db) {
+    try {
+      const result = await db.query(
+        "SELECT setting_key, setting_value FROM email_settings WHERE setting_key IN ('email_header', 'email_footer')"
+      );
+
+      let header = '';
+      let footer = '';
+      result.rows.forEach(row => {
+        if (row.setting_key === 'email_header') header = row.setting_value || '';
+        if (row.setting_key === 'email_footer') footer = row.setting_value || '';
+      });
+
+      return { header, footer };
+    } catch (error) {
+      console.error('Error fetching header/footer:', error);
+      return { header: '', footer: '' };
+    }
+  }
+
+  wrapWithHeaderFooter(body, header, footer) {
+    return `${header}${body}${footer}`;
+  }
+
   async sendEmail({ to, subject, html, from, account }) {
     const transporter = account ? this.createTransporter(account) : this.defaultTransporter;
 
@@ -87,9 +111,15 @@ class EmailService {
       errors: []
     };
 
+    // Get header and footer
+    const { header, footer } = await this.getHeaderFooter(db);
+
     for (const contact of recipients) {
       const subject = this.replaceVariables(template.subject, contact);
-      const html = this.replaceVariables(template.body, contact);
+      let body = this.replaceVariables(template.body, contact);
+
+      // Wrap with header and footer
+      const html = this.wrapWithHeaderFooter(body, header, footer);
 
       const result = await this.sendEmail({
         to: contact.email,

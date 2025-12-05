@@ -154,6 +154,53 @@ const migrate = async () => {
     `);
     console.log('Added email_account_id to email_logs table');
 
+    // Create email_settings table for header/footer
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS email_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Created email_settings table');
+
+    // Insert default header and footer if they don't exist
+    await db.query(`
+      INSERT INTO email_settings (setting_key, setting_value)
+      VALUES
+        ('email_header', '<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .email-container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #4F46E5; color: white; padding: 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .content { padding: 30px 20px; background: #ffffff; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <h1>Your Company Name</h1>
+    </div>
+    <div class="content">'),
+        ('email_footer', '    </div>
+    <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666;">
+      <p>© 2024 Your Company Name. All rights reserved.</p>
+      <p>123 Business Street, City, Country</p>
+      <p><a href="#" style="color: #4F46E5;">Unsubscribe</a> | <a href="#" style="color: #4F46E5;">Privacy Policy</a></p>
+    </div>
+  </div>
+</body>
+</html>')
+      ON CONFLICT (setting_key) DO NOTHING
+    `);
+    console.log('Inserted default email header and footer');
+
     console.log('All migrations completed successfully!');
     process.exit(0);
   } catch (error) {

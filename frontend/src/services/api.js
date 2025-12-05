@@ -73,6 +73,16 @@ export const emailAccountApi = {
   setDefault: (id) => api.post(`/email-accounts/${id}/set-default`),
 };
 
+// Email Settings (Header/Footer)
+export const emailSettingsApi = {
+  getAll: () => api.get('/email-settings'),
+  get: (key) => api.get(`/email-settings/${key}`),
+  update: (key, value) => api.put(`/email-settings/${key}`, { value }),
+  updateMultiple: (settings) => api.put('/email-settings', settings),
+  preview: (body, includeHeaderFooter = true) => api.post('/email-settings/preview', { body, includeHeaderFooter }),
+  reset: () => api.post('/email-settings/reset'),
+};
+
 // Health check
 export const healthCheck = () => api.get('/health');
 

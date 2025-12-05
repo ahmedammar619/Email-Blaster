@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Trash2, Edit2, Copy, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { templateApi } from '../services/api';
+import { templateApi, emailSettingsApi } from '../services/api';
 
 export default function Templates() {
   const [templates, setTemplates] = useState([]);
@@ -16,9 +16,20 @@ export default function Templates() {
     body: '',
   });
 
+  // Header/Footer for live preview
+  const [emailHeader, setEmailHeader] = useState('');
+  const [emailFooter, setEmailFooter] = useState('');
+  const previewIframeRef = useRef(null);
+
   useEffect(() => {
     loadTemplates();
+    loadEmailSettings();
   }, []);
+
+  // Compute live preview HTML
+  const livePreviewHtml = useMemo(() => {
+    return `${emailHeader}${formData.body}${emailFooter}`;
+  }, [emailHeader, emailFooter, formData.body]);
 
   const loadTemplates = async () => {
     try {
@@ -28,6 +39,16 @@ export default function Templates() {
       toast.error('Failed to load templates');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadEmailSettings = async () => {
+    try {
+      const res = await emailSettingsApi.getAll();
+      setEmailHeader(res.data.email_header || '');
+      setEmailFooter(res.data.email_footer || '');
+    } catch (error) {
+      console.error('Failed to load email settings');
     }
   };
 
@@ -175,61 +196,92 @@ export default function Templates() {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal with Live Preview */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
             <h2 className="text-xl font-bold mb-4">
               {editingTemplate ? 'Edit Template' : 'Create Template'}
             </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Template Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g., Welcome Email"
-                    required
-                  />
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 flex gap-6 overflow-hidden">
+                {/* Left side - Editor */}
+                <div className="flex-1 flex flex-col overflow-y-auto pr-2">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Template Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g., Welcome Email"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Subject Line
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.subject}
+                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g., Welcome to our service, {{firstName}}!"
+                        required
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Email Body (HTML)
+                      </label>
+                      <textarea
+                        value={formData.body}
+                        onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                        rows={14}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                        placeholder="<h1>Hello {{firstName}},</h1><p>Welcome to our service!</p>"
+                        required
+                      />
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        <strong>Available variables:</strong> {"{{firstName}}"}, {"{{lastName}}"}, {"{{email}}"}, {"{{company}}"}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Your email will be wrapped with the header and footer from Settings.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject Line
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.subject}
-                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g., Welcome to our service, {{firstName}}!"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email Body (HTML)
-                  </label>
-                  <textarea
-                    value={formData.body}
-                    onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                    rows={12}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
-                    placeholder="<h1>Hello {{firstName}},</h1><p>Welcome to our service!</p>"
-                    required
-                  />
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    <strong>Available variables:</strong> {"{{firstName}}"}, {"{{lastName}}"}, {"{{email}}"}, {"{{company}}"}
-                  </p>
+
+                {/* Right side - Live Preview */}
+                <div className="flex-1 flex flex-col border-l pl-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Live Preview
+                    </label>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      Updates as you type
+                    </span>
+                  </div>
+                  <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
+                    <iframe
+                      ref={previewIframeRef}
+                      srcDoc={livePreviewHtml}
+                      className="w-full h-full bg-white"
+                      title="Live Email Preview"
+                      sandbox="allow-same-origin"
+                      style={{ minHeight: '400px' }}
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-end space-x-3 mt-6">
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
