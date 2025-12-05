@@ -2,7 +2,11 @@ const fastify = require('fastify')({ logger: true });
 const cors = require('@fastify/cors');
 const multipart = require('@fastify/multipart');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+// Load .env from backend folder (works in production) or parent folder (works in local dev)
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+if (!process.env.DATABASE_URL) {
+  require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+}
 
 const db = require('./db');
 const campaignRoutes = require('./routes/campaigns');
