@@ -99,7 +99,7 @@ const start = async () => {
           `);
         }
 
-        const appUrl = process.env.APP_URL || 'http://localhost:5173';
+        const apiUrl = process.env.API_URL || 'http://localhost:3000';
 
         return reply.type('text/html').send(`
           <!DOCTYPE html>
@@ -121,7 +121,7 @@ const start = async () => {
               <p>You have been unsubscribed from our mailing list.</p>
               <p class="email">${email}</p>
               <p>Changed your mind?</p>
-              <a href="${appUrl}/resubscribe/${token}" class="btn">Resubscribe</a>
+              <a href="${apiUrl}/resubscribe/${token}" class="btn">Resubscribe</a>
             </div>
           </body>
           </html>
