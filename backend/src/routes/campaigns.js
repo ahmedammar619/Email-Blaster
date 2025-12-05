@@ -114,6 +114,148 @@ async function routes(fastify, options) {
     return { success: true };
   });
 
+  // Duplicate campaign
+  fastify.post('/:id/duplicate', async (request, reply) => {
+    const { id } = request.params;
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get original campaign
+      const originalResult = await client.query(
+        'SELECT * FROM campaigns WHERE id = $1',
+        [id]
+      );
+
+      if (originalResult.rows.length === 0) {
+        return reply.code(404).send({ error: 'Campaign not found' });
+      }
+
+      const original = originalResult.rows[0];
+
+      // Create new campaign
+      const newCampaignResult = await client.query(
+        `INSERT INTO campaigns (name, template_id, email_account_id, total_recipients, status)
+         VALUES ($1, $2, $3, $4, 'draft') RETURNING *`,
+        [`${original.name} (Copy)`, original.template_id, original.email_account_id, original.total_recipients]
+      );
+      const newCampaign = newCampaignResult.rows[0];
+
+      // Copy recipients with fresh status
+      await client.query(
+        `INSERT INTO campaign_recipients (campaign_id, contact_id, status)
+         SELECT $1, contact_id, 'pending'
+         FROM campaign_recipients
+         WHERE campaign_id = $2`,
+        [newCampaign.id, id]
+      );
+
+      await client.query('COMMIT');
+      return newCampaign;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  // Reset campaign to draft (for resending)
+  fastify.post('/:id/reset', async (request, reply) => {
+    const { id } = request.params;
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Reset campaign status and counters
+      await client.query(
+        `UPDATE campaigns
+         SET status = 'draft', sent_count = 0, failed_count = 0, sent_at = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [id]
+      );
+
+      // Reset all recipient statuses to pending
+      await client.query(
+        `UPDATE campaign_recipients
+         SET status = 'pending', sent_at = NULL, error_message = NULL
+         WHERE campaign_id = $1`,
+        [id]
+      );
+
+      await client.query('COMMIT');
+
+      const result = await db.query('SELECT * FROM campaigns WHERE id = $1', [id]);
+      return result.rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  // Add recipients to existing campaign
+  fastify.post('/:id/recipients', async (request, reply) => {
+    const { id } = request.params;
+    const { contact_ids } = request.body;
+
+    if (!contact_ids || contact_ids.length === 0) {
+      return reply.code(400).send({ error: 'No contacts provided' });
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Check campaign exists and is draft
+      const campaignResult = await client.query('SELECT * FROM campaigns WHERE id = $1', [id]);
+      if (campaignResult.rows.length === 0) {
+        return reply.code(404).send({ error: 'Campaign not found' });
+      }
+      if (campaignResult.rows[0].status !== 'draft') {
+        return reply.code(400).send({ error: 'Can only add recipients to draft campaigns' });
+      }
+
+      // Add new recipients (ignore duplicates)
+      let addedCount = 0;
+      for (const contactId of contact_ids) {
+        try {
+          await client.query(
+            `INSERT INTO campaign_recipients (campaign_id, contact_id, status)
+             VALUES ($1, $2, 'pending')
+             ON CONFLICT (campaign_id, contact_id) DO NOTHING`,
+            [id, contactId]
+          );
+          addedCount++;
+        } catch (err) {
+          // Skip duplicates
+        }
+      }
+
+      // Update total count
+      const countResult = await client.query(
+        'SELECT COUNT(*) as count FROM campaign_recipients WHERE campaign_id = $1',
+        [id]
+      );
+      await client.query(
+        'UPDATE campaigns SET total_recipients = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [countResult.rows[0].count, id]
+      );
+
+      await client.query('COMMIT');
+
+      return { success: true, added: addedCount };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
   // Get campaign recipients
   fastify.get('/:id/recipients', async (request, reply) => {
     const { id } = request.params;

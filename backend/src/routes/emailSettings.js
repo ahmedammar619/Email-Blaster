@@ -96,6 +96,10 @@ async function routes(fastify, options) {
     const footer = settings.email_footer || '';
     const bodyBg = settings.body_background_color || '#f5f7fa';
     const contentBg = settings.content_background_color || '#ffffff';
+    const contentWidth = settings.content_width || '550';
+    const contentPadding = settings.content_padding || '30';
+    const contentBorderRadius = settings.content_border_radius || '8';
+    const contentMargin = settings.content_margin || '20';
 
     // Wrap with body background
     const fullHtml = `
@@ -108,11 +112,11 @@ async function routes(fastify, options) {
 <body style="margin: 0; padding: 0; background-color: ${bodyBg};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${bodyBg};">
     <tr>
-      <td align="center" style="padding: 20px 0;">
+      <td align="center" style="padding: ${contentMargin}px 0;">
         ${header}
-        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${contentBg}; border-radius: 8px;">
+        <table role="presentation" width="${contentWidth}" cellpadding="0" cellspacing="0" style="background-color: ${contentBg}; border-radius: ${contentBorderRadius}px;">
           <tr>
-            <td style="padding: 30px;">
+            <td style="padding: ${contentPadding}px;">
               ${body}
             </td>
           </tr>
@@ -163,7 +167,11 @@ async function routes(fastify, options) {
       email_footer: defaultFooter,
       body_background_color: '#f5f7fa',
       content_background_color: '#ffffff',
-      accent_color: '#1a73e8'
+      accent_color: '#1a73e8',
+      content_width: '550',
+      content_padding: '30',
+      content_border_radius: '8',
+      content_margin: '20'
     };
 
     for (const [key, value] of Object.entries(defaults)) {

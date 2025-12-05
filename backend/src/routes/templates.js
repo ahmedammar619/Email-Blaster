@@ -115,7 +115,11 @@ async function routes(fastify, options) {
       header: '',
       footer: '',
       bodyBgColor: '#f5f7fa',
-      contentBgColor: '#ffffff'
+      contentBgColor: '#ffffff',
+      contentWidth: '550',
+      contentPadding: '30',
+      contentBorderRadius: '8',
+      contentMargin: '20'
     };
 
     settingsResult.rows.forEach(row => {
@@ -123,6 +127,10 @@ async function routes(fastify, options) {
       if (row.setting_key === 'email_footer') settings.footer = row.setting_value || '';
       if (row.setting_key === 'body_background_color') settings.bodyBgColor = row.setting_value || '#f5f7fa';
       if (row.setting_key === 'content_background_color') settings.contentBgColor = row.setting_value || '#ffffff';
+      if (row.setting_key === 'content_width') settings.contentWidth = row.setting_value || '550';
+      if (row.setting_key === 'content_padding') settings.contentPadding = row.setting_value || '30';
+      if (row.setting_key === 'content_border_radius') settings.contentBorderRadius = row.setting_value || '8';
+      if (row.setting_key === 'content_margin') settings.contentMargin = row.setting_value || '20';
     });
 
     // Replace variables with sample data
@@ -154,11 +162,11 @@ async function routes(fastify, options) {
 <body style="margin: 0; padding: 0; background-color: ${settings.bodyBgColor};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${settings.bodyBgColor};">
     <tr>
-      <td align="center" style="padding: 20px 0;">
+      <td align="center" style="padding: ${settings.contentMargin}px 0;">
         ${settings.header}
-        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${settings.contentBgColor}; border-radius: 8px;">
+        <table role="presentation" width="${settings.contentWidth}" cellpadding="0" cellspacing="0" style="background-color: ${settings.contentBgColor}; border-radius: ${settings.contentBorderRadius}px;">
           <tr>
-            <td style="padding: 30px;">
+            <td style="padding: ${settings.contentPadding}px;">
               ${previewBody}
             </td>
           </tr>

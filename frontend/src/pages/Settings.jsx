@@ -31,6 +31,11 @@ export default function Settings() {
   const [bodyBgColor, setBodyBgColor] = useState('#f5f7fa');
   const [contentBgColor, setContentBgColor] = useState('#ffffff');
   const [accentColor, setAccentColor] = useState('#1a73e8');
+  // Body styling options
+  const [contentWidth, setContentWidth] = useState('550');
+  const [contentPadding, setContentPadding] = useState('30');
+  const [contentBorderRadius, setContentBorderRadius] = useState('8');
+  const [contentMargin, setContentMargin] = useState('20');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [showHeaderFooterPreview, setShowHeaderFooterPreview] = useState(false);
@@ -61,6 +66,10 @@ export default function Settings() {
       setBodyBgColor(res.data.body_background_color || '#f5f7fa');
       setContentBgColor(res.data.content_background_color || '#ffffff');
       setAccentColor(res.data.accent_color || '#1a73e8');
+      setContentWidth(res.data.content_width || '550');
+      setContentPadding(res.data.content_padding || '30');
+      setContentBorderRadius(res.data.content_border_radius || '8');
+      setContentMargin(res.data.content_margin || '20');
     } catch (error) {
       console.error('Failed to load email settings');
     } finally {
@@ -77,6 +86,10 @@ export default function Settings() {
         body_background_color: bodyBgColor,
         content_background_color: contentBgColor,
         accent_color: accentColor,
+        content_width: contentWidth,
+        content_padding: contentPadding,
+        content_border_radius: contentBorderRadius,
+        content_margin: contentMargin,
       });
       toast.success('Email settings saved');
     } catch (error) {
@@ -94,6 +107,10 @@ export default function Settings() {
       setBodyBgColor(res.data.body_background_color || '#f5f7fa');
       setContentBgColor(res.data.content_background_color || '#ffffff');
       setAccentColor(res.data.accent_color || '#1a73e8');
+      setContentWidth(res.data.content_width || '550');
+      setContentPadding(res.data.content_padding || '30');
+      setContentBorderRadius(res.data.content_border_radius || '8');
+      setContentMargin(res.data.content_margin || '20');
       setEmailFooter(res.data.email_footer);
       toast.success('Reset to defaults');
     } catch (error) {
@@ -476,6 +493,72 @@ export default function Settings() {
                       />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Links and buttons</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body Styling Options */}
+              <div className="pt-4 border-t border-gray-200">
+                <h3 className="font-medium text-gray-900 mb-3">Content Area Styling</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Width (px)
+                    </label>
+                    <input
+                      type="number"
+                      value={contentWidth}
+                      onChange={(e) => setContentWidth(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      min="300"
+                      max="800"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">300-800px</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Padding (px)
+                    </label>
+                    <input
+                      type="number"
+                      value={contentPadding}
+                      onChange={(e) => setContentPadding(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      min="0"
+                      max="100"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Inner spacing</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Border Radius (px)
+                    </label>
+                    <input
+                      type="number"
+                      value={contentBorderRadius}
+                      onChange={(e) => setContentBorderRadius(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      min="0"
+                      max="50"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Rounded corners</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Margin (px)
+                    </label>
+                    <input
+                      type="number"
+                      value={contentMargin}
+                      onChange={(e) => setContentMargin(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      min="0"
+                      max="100"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Outer spacing</p>
                   </div>
                 </div>
               </div>

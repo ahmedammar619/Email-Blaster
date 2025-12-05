@@ -21,6 +21,10 @@ export default function Templates() {
   const [emailFooter, setEmailFooter] = useState('');
   const [bodyBgColor, setBodyBgColor] = useState('#f5f7fa');
   const [contentBgColor, setContentBgColor] = useState('#ffffff');
+  const [contentWidth, setContentWidth] = useState('550');
+  const [contentPadding, setContentPadding] = useState('30');
+  const [contentBorderRadius, setContentBorderRadius] = useState('8');
+  const [contentMargin, setContentMargin] = useState('20');
   const previewIframeRef = useRef(null);
 
   useEffect(() => {
@@ -28,24 +32,50 @@ export default function Templates() {
     loadEmailSettings();
   }, []);
 
-  // Compute live preview HTML with colors
+  // Sample data for preview
+  const sampleData = {
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john.doe@example.com',
+    company: 'Acme Corp'
+  };
+
+  // Replace variables with sample data
+  const replaceVariables = (text) => {
+    let result = text;
+    result = result.replace(/\{\{firstName\}\}/g, sampleData.firstName);
+    result = result.replace(/\{\{lastName\}\}/g, sampleData.lastName);
+    result = result.replace(/\{\{email\}\}/g, sampleData.email);
+    result = result.replace(/\{\{company\}\}/g, sampleData.company);
+    return result;
+  };
+
+  // Compute live preview HTML with colors and sample data
   const livePreviewHtml = useMemo(() => {
+    const previewBody = replaceVariables(formData.body);
+    const previewSubject = replaceVariables(formData.subject);
+
     return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    h1, h2, h3 { margin-top: 0; }
+    p { margin: 0 0 1em 0; }
+  </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${bodyBgColor};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${bodyBgColor};">
     <tr>
-      <td align="center" style="padding: 20px 0;">
+      <td align="center" style="padding: ${contentMargin}px 0;">
         ${emailHeader}
-        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${contentBgColor}; border-radius: 8px;">
+        <table role="presentation" width="${contentWidth}" cellpadding="0" cellspacing="0" style="background-color: ${contentBgColor}; border-radius: ${contentBorderRadius}px;">
           <tr>
-            <td style="padding: 30px;">
-              ${formData.body}
+            <td style="padding: ${contentPadding}px; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+              ${previewBody}
             </td>
           </tr>
         </table>
@@ -55,7 +85,7 @@ export default function Templates() {
   </table>
 </body>
 </html>`;
-  }, [emailHeader, emailFooter, formData.body, bodyBgColor, contentBgColor]);
+  }, [emailHeader, emailFooter, formData.body, formData.subject, bodyBgColor, contentBgColor, contentWidth, contentPadding, contentBorderRadius, contentMargin]);
 
   const loadTemplates = async () => {
     try {
@@ -75,6 +105,10 @@ export default function Templates() {
       setEmailFooter(res.data.email_footer || '');
       setBodyBgColor(res.data.body_background_color || '#f5f7fa');
       setContentBgColor(res.data.content_background_color || '#ffffff');
+      setContentWidth(res.data.content_width || '550');
+      setContentPadding(res.data.content_padding || '30');
+      setContentBorderRadius(res.data.content_border_radius || '8');
+      setContentMargin(res.data.content_margin || '20');
     } catch (error) {
       console.error('Failed to load email settings');
     }
@@ -293,9 +327,20 @@ export default function Templates() {
                       Live Preview
                     </label>
                     <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      Updates as you type
+                      Variables replaced with sample data
                     </span>
                   </div>
+
+                  {/* Subject Preview */}
+                  {formData.subject && (
+                    <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <span className="text-xs font-medium text-gray-500 uppercase">Subject:</span>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {replaceVariables(formData.subject)}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
                     <iframe
                       ref={previewIframeRef}

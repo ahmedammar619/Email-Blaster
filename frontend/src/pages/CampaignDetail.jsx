@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Users, Mail, CheckCircle, XCircle, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { campaignApi } from '../services/api';
+import { campaignApi, emailSettingsApi } from '../services/api';
 
 export default function CampaignDetail() {
   const { id } = useParams();
@@ -12,8 +12,19 @@ export default function CampaignDetail() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Email settings for preview
+  const [emailHeader, setEmailHeader] = useState('');
+  const [emailFooter, setEmailFooter] = useState('');
+  const [bodyBgColor, setBodyBgColor] = useState('#f5f7fa');
+  const [contentBgColor, setContentBgColor] = useState('#ffffff');
+  const [contentWidth, setContentWidth] = useState('550');
+  const [contentPadding, setContentPadding] = useState('30');
+  const [contentBorderRadius, setContentBorderRadius] = useState('8');
+  const [contentMargin, setContentMargin] = useState('20');
+
   useEffect(() => {
     loadCampaign();
+    loadEmailSettings();
   }, [id]);
 
   const loadCampaign = async () => {
@@ -33,6 +44,77 @@ export default function CampaignDetail() {
       setLoading(false);
     }
   };
+
+  const loadEmailSettings = async () => {
+    try {
+      const res = await emailSettingsApi.getAll();
+      setEmailHeader(res.data.email_header || '');
+      setEmailFooter(res.data.email_footer || '');
+      setBodyBgColor(res.data.body_background_color || '#f5f7fa');
+      setContentBgColor(res.data.content_background_color || '#ffffff');
+      setContentWidth(res.data.content_width || '550');
+      setContentPadding(res.data.content_padding || '30');
+      setContentBorderRadius(res.data.content_border_radius || '8');
+      setContentMargin(res.data.content_margin || '20');
+    } catch (error) {
+      console.error('Failed to load email settings');
+    }
+  };
+
+  // Sample data for preview
+  const sampleData = {
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john.doe@example.com',
+    company: 'Acme Corp'
+  };
+
+  const replaceVariables = (text) => {
+    if (!text) return '';
+    let result = text;
+    result = result.replace(/\{\{firstName\}\}/g, sampleData.firstName);
+    result = result.replace(/\{\{lastName\}\}/g, sampleData.lastName);
+    result = result.replace(/\{\{email\}\}/g, sampleData.email);
+    result = result.replace(/\{\{company\}\}/g, sampleData.company);
+    return result;
+  };
+
+  // Generate full email preview HTML
+  const previewHtml = useMemo(() => {
+    if (!campaign?.body) return '';
+    const previewBody = replaceVariables(campaign.body);
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    h1, h2, h3 { margin-top: 0; }
+    p { margin: 0 0 1em 0; }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: ${bodyBgColor};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${bodyBgColor};">
+    <tr>
+      <td align="center" style="padding: ${contentMargin}px 0;">
+        ${emailHeader}
+        <table role="presentation" width="${contentWidth}" cellpadding="0" cellspacing="0" style="background-color: ${contentBgColor}; border-radius: ${contentBorderRadius}px;">
+          <tr>
+            <td style="padding: ${contentPadding}px; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+              ${previewBody}
+            </td>
+          </tr>
+        </table>
+        ${emailFooter}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }, [campaign?.body, emailHeader, emailFooter, bodyBgColor, contentBgColor, contentWidth, contentPadding, contentBorderRadius, contentMargin]);
 
   const handleSend = async () => {
     if (!confirm('Are you sure you want to send this campaign?')) return;
@@ -120,20 +202,30 @@ export default function CampaignDetail() {
       {/* Email Preview */}
       {campaign.subject && campaign.body && (
         <div className="bg-white rounded-lg shadow mb-6">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Email Preview</h2>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              Variables shown with sample data
+            </span>
           </div>
           <div className="p-6">
-            <div className="mb-4">
-              <span className="text-sm font-medium text-gray-500">Subject:</span>
-              <p className="text-gray-900">{campaign.subject}</p>
+            {/* Subject Preview */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <span className="text-xs font-medium text-gray-500 uppercase">Subject:</span>
+              <p className="text-gray-900 font-medium mt-1">{replaceVariables(campaign.subject)}</p>
             </div>
+
+            {/* Email Body Preview */}
             <div>
-              <span className="text-sm font-medium text-gray-500">Body:</span>
-              <div
-                className="mt-2 p-4 bg-gray-50 rounded-lg prose max-w-none"
-                dangerouslySetInnerHTML={{ __html: campaign.body }}
-              />
+              <span className="text-sm font-medium text-gray-500 mb-2 block">Email Body:</span>
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-100" style={{ height: '500px' }}>
+                <iframe
+                  srcDoc={previewHtml}
+                  className="w-full h-full bg-white"
+                  title="Email Preview"
+                  sandbox="allow-same-origin"
+                />
+              </div>
             </div>
           </div>
         </div>

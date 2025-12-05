@@ -199,7 +199,11 @@ const migrate = async () => {
 </html>'),
         ('body_background_color', '#f5f7fa'),
         ('content_background_color', '#ffffff'),
-        ('accent_color', '#1a73e8')
+        ('accent_color', '#1a73e8'),
+        ('content_width', '550'),
+        ('content_padding', '30'),
+        ('content_border_radius', '8'),
+        ('content_margin', '20')
       ON CONFLICT (setting_key) DO NOTHING
     `);
     console.log('Inserted default email header and footer');

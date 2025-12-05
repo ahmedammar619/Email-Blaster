@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, Send, Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Trash2, Send, Eye, CheckCircle, XCircle, Clock, Copy, RotateCcw, Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { campaignApi, templateApi, contactApi, emailAccountApi } from '../services/api';
 
@@ -21,6 +21,15 @@ export default function Campaigns() {
     contact_ids: [],
     email_account_id: '',
   });
+
+  // Contact filtering
+  const [companies, setCompanies] = useState([]);
+  const [contactFilter, setContactFilter] = useState({
+    search: '',
+    subscribed: 'all',
+    company: '',
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -48,16 +57,18 @@ export default function Campaigns() {
 
   const loadData = async () => {
     try {
-      const [campaignsRes, templatesRes, contactsRes, accountsRes] = await Promise.all([
+      const [campaignsRes, templatesRes, contactsRes, accountsRes, companiesRes] = await Promise.all([
         campaignApi.getAll(),
         templateApi.getAll(),
         contactApi.getAll({ limit: 1000 }),
         emailAccountApi.getAll(),
+        contactApi.getCompanies(),
       ]);
       setCampaigns(campaignsRes.data);
       setTemplates(templatesRes.data);
       setContacts(contactsRes.data.contacts);
       setEmailAccounts(accountsRes.data);
+      setCompanies(companiesRes.data || []);
 
       // Set default email account
       const defaultAccount = accountsRes.data.find(a => a.is_default);
@@ -71,6 +82,35 @@ export default function Campaigns() {
       setLoading(false);
     }
   };
+
+  // Filter contacts based on criteria
+  const filteredContacts = useMemo(() => {
+    return contacts.filter(contact => {
+      // Search filter
+      if (contactFilter.search) {
+        const search = contactFilter.search.toLowerCase();
+        const matchesSearch =
+          contact.email?.toLowerCase().includes(search) ||
+          contact.first_name?.toLowerCase().includes(search) ||
+          contact.last_name?.toLowerCase().includes(search) ||
+          contact.company?.toLowerCase().includes(search);
+        if (!matchesSearch) return false;
+      }
+
+      // Subscription filter
+      if (contactFilter.subscribed !== 'all') {
+        if (contactFilter.subscribed === 'subscribed' && !contact.subscribed) return false;
+        if (contactFilter.subscribed === 'unsubscribed' && contact.subscribed) return false;
+      }
+
+      // Company filter
+      if (contactFilter.company && contact.company !== contactFilter.company) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [contacts, contactFilter]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -94,6 +134,41 @@ export default function Campaigns() {
     } catch (error) {
       toast.error('Failed to delete campaign');
     }
+  };
+
+  const handleDuplicate = async (id) => {
+    try {
+      await campaignApi.duplicate(id);
+      toast.success('Campaign duplicated');
+      loadData();
+    } catch (error) {
+      toast.error('Failed to duplicate campaign');
+    }
+  };
+
+  const handleReset = async (id) => {
+    if (!confirm('Are you sure you want to reset this campaign to draft? This will allow you to resend it.')) return;
+    try {
+      await campaignApi.reset(id);
+      toast.success('Campaign reset to draft');
+      loadData();
+    } catch (error) {
+      toast.error('Failed to reset campaign');
+    }
+  };
+
+  const selectFilteredContacts = () => {
+    setFormData((prev) => ({
+      ...prev,
+      contact_ids: [...new Set([...prev.contact_ids, ...filteredContacts.map(c => c.id)])],
+    }));
+  };
+
+  const clearContactSelection = () => {
+    setFormData((prev) => ({
+      ...prev,
+      contact_ids: [],
+    }));
   };
 
   const openSendModal = (campaign) => {
@@ -234,7 +309,7 @@ export default function Campaigns() {
                     <span className="text-red-600">{campaign.failed_count}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="flex justify-end space-x-2">
+                    <div className="flex justify-end space-x-1">
                       <Link
                         to={`/campaigns/${campaign.id}`}
                         className="p-2 text-gray-400 hover:text-indigo-600"
@@ -251,6 +326,22 @@ export default function Campaigns() {
                           <Send className="h-5 w-5" />
                         </button>
                       )}
+                      {campaign.status === 'sent' && (
+                        <button
+                          onClick={() => handleReset(campaign.id)}
+                          className="p-2 text-gray-400 hover:text-orange-600"
+                          title="Reset to Draft (Resend)"
+                        >
+                          <RotateCcw className="h-5 w-5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDuplicate(campaign.id)}
+                        className="p-2 text-gray-400 hover:text-blue-600"
+                        title="Duplicate"
+                      >
+                        <Copy className="h-5 w-5" />
+                      </button>
                       <button
                         onClick={() => handleDelete(campaign.id)}
                         className="p-2 text-gray-400 hover:text-red-600"
@@ -324,32 +415,129 @@ export default function Campaigns() {
                     <label className="block text-sm font-medium text-gray-700">
                       Recipients ({formData.contact_ids.length} selected)
                     </label>
-                    <button
-                      type="button"
-                      onClick={selectAllContacts}
-                      className="text-sm text-indigo-600 hover:underline"
-                    >
-                      Select All
-                    </button>
-                  </div>
-                  <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
-                    {contacts.map((contact) => (
-                      <label
-                        key={contact.id}
-                        className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center text-sm px-2 py-1 rounded ${showFilters ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={formData.contact_ids.includes(contact.id)}
-                          onChange={() => toggleContact(contact.id)}
-                          className="h-4 w-4 text-indigo-600 rounded"
-                        />
-                        <span className="ml-3 text-sm text-gray-700">
-                          {contact.email}
-                          {contact.first_name && ` (${contact.first_name} ${contact.last_name || ''})`}
-                        </span>
-                      </label>
-                    ))}
+                        <Filter className="h-4 w-4 mr-1" />
+                        Filter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={selectFilteredContacts}
+                        className="text-sm text-indigo-600 hover:underline"
+                      >
+                        Add Filtered ({filteredContacts.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={selectAllContacts}
+                        className="text-sm text-indigo-600 hover:underline"
+                      >
+                        Select All
+                      </button>
+                      {formData.contact_ids.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={clearContactSelection}
+                          className="text-sm text-red-600 hover:underline"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Filter Panel */}
+                  {showFilters && (
+                    <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
+                          <input
+                            type="text"
+                            value={contactFilter.search}
+                            onChange={(e) => setContactFilter({...contactFilter, search: e.target.value})}
+                            placeholder="Email, name, company..."
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                          <select
+                            value={contactFilter.subscribed}
+                            onChange={(e) => setContactFilter({...contactFilter, subscribed: e.target.value})}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="all">All</option>
+                            <option value="subscribed">Subscribed</option>
+                            <option value="unsubscribed">Unsubscribed</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Company</label>
+                          <select
+                            value={contactFilter.company}
+                            onChange={(e) => setContactFilter({...contactFilter, company: e.target.value})}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="">All Companies</option>
+                            {companies.map((company) => (
+                              <option key={company} value={company}>{company}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {(contactFilter.search || contactFilter.subscribed !== 'all' || contactFilter.company) && (
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-xs text-gray-500">
+                            Showing {filteredContacts.length} of {contacts.length} contacts
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setContactFilter({ search: '', subscribed: 'all', company: '' })}
+                            className="text-xs text-red-600 hover:underline flex items-center"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Clear filters
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
+                    {filteredContacts.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-gray-500 text-sm">
+                        No contacts match the current filters
+                      </div>
+                    ) : (
+                      filteredContacts.map((contact) => (
+                        <label
+                          key={contact.id}
+                          className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.contact_ids.includes(contact.id)}
+                            onChange={() => toggleContact(contact.id)}
+                            className="h-4 w-4 text-indigo-600 rounded"
+                          />
+                          <span className="ml-3 text-sm text-gray-700 flex-1">
+                            {contact.email}
+                            {contact.first_name && ` (${contact.first_name} ${contact.last_name || ''})`}
+                          </span>
+                          {contact.company && (
+                            <span className="text-xs text-gray-400 ml-2">{contact.company}</span>
+                          )}
+                          {!contact.subscribed && (
+                            <span className="text-xs bg-red-100 text-red-600 px-1 rounded ml-2">unsubscribed</span>
+                          )}
+                        </label>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
