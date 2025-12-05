@@ -106,16 +106,23 @@ async function routes(fastify, options) {
 
     const template = result.rows[0];
 
-    // Get header and footer
+    // Get all email settings
     const settingsResult = await db.query(
-      "SELECT setting_key, setting_value FROM email_settings WHERE setting_key IN ('email_header', 'email_footer')"
+      "SELECT setting_key, setting_value FROM email_settings"
     );
 
-    let header = '';
-    let footer = '';
+    const settings = {
+      header: '',
+      footer: '',
+      bodyBgColor: '#f5f7fa',
+      contentBgColor: '#ffffff'
+    };
+
     settingsResult.rows.forEach(row => {
-      if (row.setting_key === 'email_header') header = row.setting_value || '';
-      if (row.setting_key === 'email_footer') footer = row.setting_value || '';
+      if (row.setting_key === 'email_header') settings.header = row.setting_value || '';
+      if (row.setting_key === 'email_footer') settings.footer = row.setting_value || '';
+      if (row.setting_key === 'body_background_color') settings.bodyBgColor = row.setting_value || '#f5f7fa';
+      if (row.setting_key === 'content_background_color') settings.contentBgColor = row.setting_value || '#ffffff';
     });
 
     // Replace variables with sample data
@@ -136,8 +143,32 @@ async function routes(fastify, options) {
       previewBody = previewBody.replace(regex, value);
     });
 
-    // Wrap body with header and footer
-    const fullBody = `${header}${previewBody}${footer}`;
+    // Wrap body with header, footer, and background colors
+    const fullBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: ${settings.bodyBgColor};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${settings.bodyBgColor};">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
+        ${settings.header}
+        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${settings.contentBgColor}; border-radius: 8px;">
+          <tr>
+            <td style="padding: 30px;">
+              ${previewBody}
+            </td>
+          </tr>
+        </table>
+        ${settings.footer}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
     return {
       subject: previewSubject,

@@ -82,19 +82,47 @@ async function routes(fastify, options) {
       return { html: body };
     }
 
-    // Get header and footer
+    // Get all settings
     const settingsResult = await db.query(
-      "SELECT setting_key, setting_value FROM email_settings WHERE setting_key IN ('email_header', 'email_footer')"
+      "SELECT setting_key, setting_value FROM email_settings"
     );
 
-    let header = '';
-    let footer = '';
+    const settings = {};
     settingsResult.rows.forEach(row => {
-      if (row.setting_key === 'email_header') header = row.setting_value || '';
-      if (row.setting_key === 'email_footer') footer = row.setting_value || '';
+      settings[row.setting_key] = row.setting_value || '';
     });
 
-    const fullHtml = `${header}${body}${footer}`;
+    const header = settings.email_header || '';
+    const footer = settings.email_footer || '';
+    const bodyBg = settings.body_background_color || '#f5f7fa';
+    const contentBg = settings.content_background_color || '#ffffff';
+
+    // Wrap with body background
+    const fullHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: ${bodyBg};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${bodyBg};">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
+        ${header}
+        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${contentBg}; border-radius: 8px;">
+          <tr>
+            <td style="padding: 30px;">
+              ${body}
+            </td>
+          </tr>
+        </table>
+        ${footer}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
     return { html: fullHtml };
   });
 
@@ -130,19 +158,27 @@ async function routes(fastify, options) {
 </body>
 </html>`;
 
-    await db.query(
-      `UPDATE email_settings SET setting_value = $1, updated_at = CURRENT_TIMESTAMP WHERE setting_key = 'email_header'`,
-      [defaultHeader]
-    );
-    await db.query(
-      `UPDATE email_settings SET setting_value = $1, updated_at = CURRENT_TIMESTAMP WHERE setting_key = 'email_footer'`,
-      [defaultFooter]
-    );
+    const defaults = {
+      email_header: defaultHeader,
+      email_footer: defaultFooter,
+      body_background_color: '#f5f7fa',
+      content_background_color: '#ffffff',
+      accent_color: '#1a73e8'
+    };
+
+    for (const [key, value] of Object.entries(defaults)) {
+      await db.query(
+        `INSERT INTO email_settings (setting_key, setting_value, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT (setting_key)
+         DO UPDATE SET setting_value = $2, updated_at = CURRENT_TIMESTAMP`,
+        [key, value]
+      );
+    }
 
     return {
       success: true,
-      email_header: defaultHeader,
-      email_footer: defaultFooter
+      ...defaults
     };
   });
 }

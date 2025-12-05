@@ -28,6 +28,9 @@ export default function Settings() {
   // Email Header/Footer Settings
   const [emailHeader, setEmailHeader] = useState('');
   const [emailFooter, setEmailFooter] = useState('');
+  const [bodyBgColor, setBodyBgColor] = useState('#f5f7fa');
+  const [contentBgColor, setContentBgColor] = useState('#ffffff');
+  const [accentColor, setAccentColor] = useState('#1a73e8');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [showHeaderFooterPreview, setShowHeaderFooterPreview] = useState(false);
@@ -55,6 +58,9 @@ export default function Settings() {
       const res = await emailSettingsApi.getAll();
       setEmailHeader(res.data.email_header || '');
       setEmailFooter(res.data.email_footer || '');
+      setBodyBgColor(res.data.body_background_color || '#f5f7fa');
+      setContentBgColor(res.data.content_background_color || '#ffffff');
+      setAccentColor(res.data.accent_color || '#1a73e8');
     } catch (error) {
       console.error('Failed to load email settings');
     } finally {
@@ -68,8 +74,11 @@ export default function Settings() {
       await emailSettingsApi.updateMultiple({
         email_header: emailHeader,
         email_footer: emailFooter,
+        body_background_color: bodyBgColor,
+        content_background_color: contentBgColor,
+        accent_color: accentColor,
       });
-      toast.success('Email header/footer saved');
+      toast.success('Email settings saved');
     } catch (error) {
       toast.error('Failed to save email settings');
     } finally {
@@ -78,10 +87,13 @@ export default function Settings() {
   };
 
   const resetEmailSettings = async () => {
-    if (!confirm('Are you sure you want to reset header/footer to defaults?')) return;
+    if (!confirm('Are you sure you want to reset email settings to defaults?')) return;
     try {
       const res = await emailSettingsApi.reset();
       setEmailHeader(res.data.email_header);
+      setBodyBgColor(res.data.body_background_color || '#f5f7fa');
+      setContentBgColor(res.data.content_background_color || '#ffffff');
+      setAccentColor(res.data.accent_color || '#1a73e8');
       setEmailFooter(res.data.email_footer);
       toast.success('Reset to defaults');
     } catch (error) {
@@ -394,6 +406,78 @@ export default function Settings() {
                 <p className="text-xs text-gray-500 mt-1">
                   Include closing tags, footer content, and unsubscribe links
                 </p>
+              </div>
+
+              {/* Color Settings */}
+              <div className="pt-4 border-t border-gray-200">
+                <h3 className="font-medium text-gray-900 mb-3">Email Colors</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Body Background
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={bodyBgColor}
+                        onChange={(e) => setBodyBgColor(e.target.value)}
+                        className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={bodyBgColor}
+                        onChange={(e) => setBodyBgColor(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                        placeholder="#f5f7fa"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Outer background color</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Content Background
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={contentBgColor}
+                        onChange={(e) => setContentBgColor(e.target.value)}
+                        className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={contentBgColor}
+                        onChange={(e) => setContentBgColor(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                        placeholder="#ffffff"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Email content area</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Accent Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                        placeholder="#1a73e8"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Links and buttons</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}

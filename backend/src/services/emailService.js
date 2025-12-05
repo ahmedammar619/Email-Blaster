@@ -56,28 +56,63 @@ class EmailService {
     return result;
   }
 
-  async getHeaderFooter(db) {
+  async getEmailSettings(db) {
     try {
       const result = await db.query(
-        "SELECT setting_key, setting_value FROM email_settings WHERE setting_key IN ('email_header', 'email_footer')"
+        "SELECT setting_key, setting_value FROM email_settings"
       );
 
-      let header = '';
-      let footer = '';
+      const settings = {
+        header: '',
+        footer: '',
+        bodyBgColor: '#f5f7fa',
+        contentBgColor: '#ffffff',
+        accentColor: '#1a73e8'
+      };
+
       result.rows.forEach(row => {
-        if (row.setting_key === 'email_header') header = row.setting_value || '';
-        if (row.setting_key === 'email_footer') footer = row.setting_value || '';
+        if (row.setting_key === 'email_header') settings.header = row.setting_value || '';
+        if (row.setting_key === 'email_footer') settings.footer = row.setting_value || '';
+        if (row.setting_key === 'body_background_color') settings.bodyBgColor = row.setting_value || '#f5f7fa';
+        if (row.setting_key === 'content_background_color') settings.contentBgColor = row.setting_value || '#ffffff';
+        if (row.setting_key === 'accent_color') settings.accentColor = row.setting_value || '#1a73e8';
       });
 
-      return { header, footer };
+      return settings;
     } catch (error) {
-      console.error('Error fetching header/footer:', error);
-      return { header: '', footer: '' };
+      console.error('Error fetching email settings:', error);
+      return { header: '', footer: '', bodyBgColor: '#f5f7fa', contentBgColor: '#ffffff', accentColor: '#1a73e8' };
     }
   }
 
-  wrapWithHeaderFooter(body, header, footer) {
-    return `${header}${body}${footer}`;
+  wrapWithSettings(body, settings) {
+    const { header, footer, bodyBgColor, contentBgColor } = settings;
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: ${bodyBgColor};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${bodyBgColor};">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
+        ${header}
+        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${contentBgColor}; border-radius: 8px;">
+          <tr>
+            <td style="padding: 30px;">
+              ${body}
+            </td>
+          </tr>
+        </table>
+        ${footer}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
   }
 
   async sendEmail({ to, subject, html, from, account }) {
@@ -111,15 +146,15 @@ class EmailService {
       errors: []
     };
 
-    // Get header and footer
-    const { header, footer } = await this.getHeaderFooter(db);
+    // Get email settings (header, footer, colors)
+    const emailSettings = await this.getEmailSettings(db);
 
     for (const contact of recipients) {
       const subject = this.replaceVariables(template.subject, contact);
       let body = this.replaceVariables(template.body, contact);
 
-      // Wrap with header and footer
-      const html = this.wrapWithHeaderFooter(body, header, footer);
+      // Wrap with header, footer, and background colors
+      const html = this.wrapWithSettings(body, emailSettings);
 
       const result = await this.sendEmail({
         to: contact.email,

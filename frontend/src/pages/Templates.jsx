@@ -16,9 +16,11 @@ export default function Templates() {
     body: '',
   });
 
-  // Header/Footer for live preview
+  // Header/Footer and colors for live preview
   const [emailHeader, setEmailHeader] = useState('');
   const [emailFooter, setEmailFooter] = useState('');
+  const [bodyBgColor, setBodyBgColor] = useState('#f5f7fa');
+  const [contentBgColor, setContentBgColor] = useState('#ffffff');
   const previewIframeRef = useRef(null);
 
   useEffect(() => {
@@ -26,10 +28,34 @@ export default function Templates() {
     loadEmailSettings();
   }, []);
 
-  // Compute live preview HTML
+  // Compute live preview HTML with colors
   const livePreviewHtml = useMemo(() => {
-    return `${emailHeader}${formData.body}${emailFooter}`;
-  }, [emailHeader, emailFooter, formData.body]);
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: ${bodyBgColor};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${bodyBgColor};">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
+        ${emailHeader}
+        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${contentBgColor}; border-radius: 8px;">
+          <tr>
+            <td style="padding: 30px;">
+              ${formData.body}
+            </td>
+          </tr>
+        </table>
+        ${emailFooter}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }, [emailHeader, emailFooter, formData.body, bodyBgColor, contentBgColor]);
 
   const loadTemplates = async () => {
     try {
@@ -47,6 +73,8 @@ export default function Templates() {
       const res = await emailSettingsApi.getAll();
       setEmailHeader(res.data.email_header || '');
       setEmailFooter(res.data.email_footer || '');
+      setBodyBgColor(res.data.body_background_color || '#f5f7fa');
+      setContentBgColor(res.data.content_background_color || '#ffffff');
     } catch (error) {
       console.error('Failed to load email settings');
     }
