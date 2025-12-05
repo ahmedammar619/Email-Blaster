@@ -8,7 +8,8 @@ import {
   Settings,
   Menu,
   X,
-  AtSign
+  AtSign,
+  Code
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -104,9 +105,25 @@ export default function Layout() {
           <span className="ml-4 text-lg font-semibold text-gray-900">Email Blaster</span>
         </div>
 
-        <main className="p-6">
+        <main className="p-6 min-h-[calc(100vh-4rem)]">
           <Outlet />
         </main>
+
+        {/* Footer */}
+        <footer className="bg-white border-t border-gray-200 py-4 px-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-500">
+            <p>&copy; {new Date().getFullYear()} Email Blaster. All rights reserved.</p>
+            <a
+              href="https://ahmedammar.dev?blaster"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-200 hover:bg-indigo-100 text-gray-600 hover:text-indigo-600 rounded-md transition-colors"
+            >
+              <Code className="h-4 w-4" />
+              Developer
+            </a>
+          </div>
+        </footer>
       </div>
     </div>
   );
