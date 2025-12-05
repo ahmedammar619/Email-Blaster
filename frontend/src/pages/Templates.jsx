@@ -304,22 +304,26 @@ export default function Templates() {
       {/* Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
             <h2 className="text-xl font-bold mb-4">Template Preview</h2>
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
               <div>
                 <span className="text-sm font-medium text-gray-500">Subject:</span>
-                <p className="text-gray-900 mt-1">{previewContent.subject}</p>
+                <p className="text-gray-900 mt-1 font-medium">{previewContent.subject}</p>
               </div>
-              <div>
-                <span className="text-sm font-medium text-gray-500">Body:</span>
-                <div
-                  className="mt-2 p-4 bg-gray-50 rounded-lg prose max-w-none"
-                  dangerouslySetInnerHTML={{ __html: previewContent.body }}
-                />
+              <div className="flex-1 overflow-hidden">
+                <span className="text-sm font-medium text-gray-500">Email Preview:</span>
+                <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden bg-gray-100" style={{ height: '450px' }}>
+                  <iframe
+                    srcDoc={previewContent.body}
+                    className="w-full h-full bg-white"
+                    title="Email Preview"
+                    sandbox="allow-same-origin"
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-end mt-6 pt-4 border-t">
               <button
                 onClick={() => setShowPreview(false)}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"

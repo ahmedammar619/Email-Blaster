@@ -106,6 +106,18 @@ async function routes(fastify, options) {
 
     const template = result.rows[0];
 
+    // Get header and footer
+    const settingsResult = await db.query(
+      "SELECT setting_key, setting_value FROM email_settings WHERE setting_key IN ('email_header', 'email_footer')"
+    );
+
+    let header = '';
+    let footer = '';
+    settingsResult.rows.forEach(row => {
+      if (row.setting_key === 'email_header') header = row.setting_value || '';
+      if (row.setting_key === 'email_footer') footer = row.setting_value || '';
+    });
+
     // Replace variables with sample data
     let previewSubject = template.subject;
     let previewBody = template.body;
@@ -124,9 +136,12 @@ async function routes(fastify, options) {
       previewBody = previewBody.replace(regex, value);
     });
 
+    // Wrap body with header and footer
+    const fullBody = `${header}${previewBody}${footer}`;
+
     return {
       subject: previewSubject,
-      body: previewBody
+      body: fullBody
     };
   });
 }
