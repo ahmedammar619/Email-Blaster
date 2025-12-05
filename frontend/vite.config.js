@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    allowedHosts: ['localhost', 'yeeloz.com', '.yeeloz.com'],
     watch: {
       usePolling: true,
       interval: 1000
