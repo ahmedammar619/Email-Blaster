@@ -40,6 +40,7 @@ export const contactApi = {
   unsubscribe: (id) => api.post(`/contacts/${id}/unsubscribe`),
   getGroups: () => api.get('/contacts/groups'),
   createGroup: (data) => api.post('/contacts/groups', data),
+  getCompanies: () => api.get('/contacts/companies'),
 };
 
 // Templates

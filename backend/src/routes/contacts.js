@@ -5,7 +5,7 @@ async function routes(fastify, options) {
 
   // Get all contacts
   fastify.get('/', async (request, reply) => {
-    const { search, subscribed, limit = 100, offset = 0 } = request.query;
+    const { search, subscribed, company, limit = 100, offset = 0 } = request.query;
 
     let query = 'SELECT * FROM contacts WHERE 1=1';
     const params = [];
@@ -17,9 +17,15 @@ async function routes(fastify, options) {
       paramIndex++;
     }
 
-    if (subscribed !== undefined) {
+    if (subscribed !== undefined && subscribed !== '') {
       query += ` AND subscribed = $${paramIndex}`;
       params.push(subscribed === 'true');
+      paramIndex++;
+    }
+
+    if (company) {
+      query += ` AND company ILIKE $${paramIndex}`;
+      params.push(`%${company}%`);
       paramIndex++;
     }
 
@@ -39,9 +45,16 @@ async function routes(fastify, options) {
       countIndex++;
     }
 
-    if (subscribed !== undefined) {
+    if (subscribed !== undefined && subscribed !== '') {
       countQuery += ` AND subscribed = $${countIndex}`;
       countParams.push(subscribed === 'true');
+      countIndex++;
+    }
+
+    if (company) {
+      countQuery += ` AND company ILIKE $${countIndex}`;
+      countParams.push(`%${company}%`);
+      countIndex++;
     }
 
     const countResult = await db.query(countQuery, countParams);
@@ -52,6 +65,14 @@ async function routes(fastify, options) {
       limit: parseInt(limit),
       offset: parseInt(offset)
     };
+  });
+
+  // Get unique companies for filter dropdown
+  fastify.get('/companies', async (request, reply) => {
+    const result = await db.query(
+      `SELECT DISTINCT company FROM contacts WHERE company IS NOT NULL AND company != '' ORDER BY company`
+    );
+    return result.rows.map(r => r.company);
   });
 
   // Get single contact
