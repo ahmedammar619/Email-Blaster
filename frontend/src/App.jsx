@@ -6,6 +6,7 @@ import CampaignDetail from './pages/CampaignDetail';
 import Contacts from './pages/Contacts';
 import Templates from './pages/Templates';
 import EmailLogs from './pages/EmailLogs';
+import EmailAccounts from './pages/EmailAccounts';
 import Settings from './pages/Settings';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
         <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="templates" element={<Templates />} />
+        <Route path="email-accounts" element={<EmailAccounts />} />
         <Route path="logs" element={<EmailLogs />} />
         <Route path="settings" element={<Settings />} />
       </Route>

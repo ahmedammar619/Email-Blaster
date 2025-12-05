@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Send, Plus, Trash2, Edit2, Star } from 'lucide-react';
+import { Plus, Trash2, Edit2, Star, Send, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { emailApi, healthCheck, emailAccountApi } from '../services/api';
+import { emailAccountApi } from '../services/api';
 
-export default function Settings() {
-  const [apiStatus, setApiStatus] = useState(null);
-  const [testEmail, setTestEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  // Email Accounts
+export default function EmailAccounts() {
   const [accounts, setAccounts] = useState([]);
-  const [loadingAccounts, setLoadingAccounts] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
+  const [testEmail, setTestEmail] = useState('');
   const [testingId, setTestingId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -34,26 +30,14 @@ export default function Settings() {
       const res = await emailAccountApi.getAll();
       setAccounts(res.data);
     } catch (error) {
-      console.error('Failed to load email accounts');
+      toast.error('Failed to load email accounts');
     } finally {
-      setLoadingAccounts(false);
-    }
-  };
-
-  const checkAPI = async () => {
-    try {
-      const res = await healthCheck();
-      setApiStatus({ success: true, timestamp: res.data.timestamp });
-      toast.success('API is healthy');
-    } catch (error) {
-      setApiStatus({ success: false, message: error.message });
-      toast.error('API health check failed');
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     try {
       if (editingAccount) {
         await emailAccountApi.update(editingAccount.id, formData);
@@ -68,8 +52,6 @@ export default function Settings() {
       loadAccounts();
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to save email account');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -94,7 +76,7 @@ export default function Settings() {
       smtp_host: account.smtp_host,
       smtp_port: account.smtp_port,
       smtp_user: account.smtp_user,
-      smtp_pass: '',
+      smtp_pass: '', // Don't populate password for security
       smtp_secure: account.smtp_secure,
       is_default: account.is_default,
     });
@@ -124,7 +106,7 @@ export default function Settings() {
 
   const handleTest = async (id) => {
     if (!testEmail) {
-      toast.error('Please enter a test email address first');
+      toast.error('Please enter a test email address');
       return;
     }
     setTestingId(id);
@@ -158,166 +140,118 @@ export default function Settings() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Email Accounts</h1>
+        <button
+          onClick={() => {
+            setEditingAccount(null);
+            resetForm();
+            setShowModal(true);
+          }}
+          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          Add Account
+        </button>
+      </div>
 
-      <div className="space-y-6">
-        {/* Email Accounts Section */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Email Accounts</h2>
-            <button
-              onClick={() => {
-                setEditingAccount(null);
-                resetForm();
-                setShowModal(true);
-              }}
-              className="flex items-center px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add Account
-            </button>
+      {/* Test Email Input */}
+      <div className="mb-6 bg-white rounded-lg shadow p-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Test Email Address (for testing connections)
+        </label>
+        <input
+          type="email"
+          value={testEmail}
+          onChange={(e) => setTestEmail(e.target.value)}
+          placeholder="Enter email to receive test messages"
+          className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      {/* Accounts List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {accounts.length === 0 ? (
+          <div className="col-span-full text-center py-12 bg-white rounded-lg shadow">
+            <p className="text-gray-500">No email accounts configured. Add your first email account to start sending campaigns.</p>
           </div>
-
-          {/* Test Email Input */}
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Test Email Address
-            </label>
-            <input
-              type="email"
-              value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)}
-              placeholder="Enter email to receive test messages"
-              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-            />
-          </div>
-
-          {loadingAccounts ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-          ) : accounts.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>No email accounts configured yet.</p>
-              <p className="text-sm mt-1">Add an email account to start sending campaigns.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {accounts.map((account) => (
-                <div
-                  key={account.id}
-                  className={`flex items-center justify-between p-4 border rounded-lg ${
-                    account.is_default ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    {account.is_default && (
-                      <Star className="h-5 w-5 text-indigo-600 fill-current mr-3" />
-                    )}
-                    <div>
-                      <p className="font-medium text-gray-900">{account.name}</p>
-                      <p className="text-sm text-gray-500">{account.email}</p>
-                      <p className="text-xs text-gray-400">{account.smtp_host}:{account.smtp_port}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleTest(account.id)}
-                      disabled={testingId === account.id}
-                      className="p-2 text-gray-400 hover:text-indigo-600 disabled:opacity-50"
-                      title="Test"
-                    >
-                      {testingId === account.id ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
-                      ) : (
-                        <Send className="h-5 w-5" />
-                      )}
-                    </button>
-                    {!account.is_default && (
-                      <button
-                        onClick={() => handleSetDefault(account.id)}
-                        className="p-2 text-gray-400 hover:text-yellow-500"
-                        title="Set as Default"
-                      >
-                        <Star className="h-5 w-5" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleEdit(account)}
-                      className="p-2 text-gray-400 hover:text-indigo-600"
-                      title="Edit"
-                    >
-                      <Edit2 className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(account.id)}
-                      className="p-2 text-gray-400 hover:text-red-600"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  </div>
+        ) : (
+          accounts.map((account) => (
+            <div key={account.id} className={`bg-white rounded-lg shadow overflow-hidden ${account.is_default ? 'ring-2 ring-indigo-500' : ''}`}>
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900">{account.name}</h3>
+                  {account.is_default && (
+                    <span className="flex items-center text-xs text-indigo-600 font-medium">
+                      <Star className="h-4 w-4 mr-1 fill-current" />
+                      Default
+                    </span>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Connection Status */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">System Status</h2>
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center">
-              {apiStatus === null ? (
-                <div className="h-5 w-5 rounded-full bg-gray-300 mr-3"></div>
-              ) : apiStatus.success ? (
-                <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-500 mr-3" />
-              )}
-              <div>
-                <p className="font-medium">API Server</p>
-                <p className="text-sm text-gray-500">
-                  {apiStatus ? (apiStatus.success ? `Connected - ${apiStatus.timestamp}` : apiStatus.message) : 'Not checked'}
-                </p>
+                <p className="text-sm text-gray-500 mt-1">{account.email}</p>
+              </div>
+              <div className="p-4 bg-gray-50 text-sm">
+                <p><span className="text-gray-500">Host:</span> {account.smtp_host}</p>
+                <p><span className="text-gray-500">Port:</span> {account.smtp_port}</p>
+                <p><span className="text-gray-500">User:</span> {account.smtp_user}</p>
+              </div>
+              <div className="px-4 py-3 border-t border-gray-200 flex justify-between items-center">
+                <button
+                  onClick={() => handleTest(account.id)}
+                  disabled={testingId === account.id}
+                  className="flex items-center text-sm text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                >
+                  {testingId === account.id ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mr-2"></div>
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-1" />
+                      Test
+                    </>
+                  )}
+                </button>
+                <div className="flex space-x-1">
+                  {!account.is_default && (
+                    <button
+                      onClick={() => handleSetDefault(account.id)}
+                      className="p-1.5 text-gray-400 hover:text-yellow-500"
+                      title="Set as Default"
+                    >
+                      <Star className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleEdit(account)}
+                    className="p-1.5 text-gray-400 hover:text-indigo-600"
+                    title="Edit"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(account.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-600"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
-            <button
-              onClick={checkAPI}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              Check
-            </button>
-          </div>
-        </div>
-
-        {/* Template Variables */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Template Variables</h2>
-          <p className="text-gray-600 mb-4">
-            Use these variables in your email templates for personalization:
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-50 p-3 rounded-lg text-center">
-              <code className="text-indigo-600">{"{{firstName}}"}</code>
-              <p className="text-sm text-gray-500 mt-1">First name</p>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-lg text-center">
-              <code className="text-indigo-600">{"{{lastName}}"}</code>
-              <p className="text-sm text-gray-500 mt-1">Last name</p>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-lg text-center">
-              <code className="text-indigo-600">{"{{email}}"}</code>
-              <p className="text-sm text-gray-500 mt-1">Email address</p>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-lg text-center">
-              <code className="text-indigo-600">{"{{company}}"}</code>
-              <p className="text-sm text-gray-500 mt-1">Company name</p>
-            </div>
-          </div>
-        </div>
+          ))
+        )}
       </div>
 
       {/* Create/Edit Modal */}
@@ -467,10 +401,9 @@ export default function Settings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                 >
-                  {loading ? 'Saving...' : editingAccount ? 'Update' : 'Create'}
+                  {editingAccount ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>

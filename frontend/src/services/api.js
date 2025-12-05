@@ -17,8 +17,9 @@ export const campaignApi = {
   update: (id, data) => api.put(`/campaigns/${id}`, data),
   delete: (id) => api.delete(`/campaigns/${id}`),
   getRecipients: (id) => api.get(`/campaigns/${id}/recipients`),
-  send: (id) => api.post(`/campaigns/${id}/send`),
+  send: (id, emailAccountId) => api.post(`/campaigns/${id}/send`, { email_account_id: emailAccountId }),
   getStats: (id) => api.get(`/campaigns/${id}/stats`),
+  getProgress: (id) => api.get(`/campaigns/${id}/progress`),
 };
 
 // Contacts
@@ -59,6 +60,17 @@ export const emailApi = {
   sendTest: (data) => api.post('/emails/test', data),
   verifySMTP: () => api.get('/emails/verify-smtp'),
   send: (data) => api.post('/emails/send', data),
+};
+
+// Email Accounts
+export const emailAccountApi = {
+  getAll: () => api.get('/email-accounts'),
+  getById: (id) => api.get(`/email-accounts/${id}`),
+  create: (data) => api.post('/email-accounts', data),
+  update: (id, data) => api.put(`/email-accounts/${id}`, data),
+  delete: (id) => api.delete(`/email-accounts/${id}`),
+  test: (id, testEmail) => api.post(`/email-accounts/${id}/test`, { test_email: testEmail }),
+  setDefault: (id) => api.post(`/email-accounts/${id}/set-default`),
 };
 
 // Health check

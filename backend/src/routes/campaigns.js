@@ -6,9 +6,10 @@ async function routes(fastify, options) {
   // Get all campaigns
   fastify.get('/', async (request, reply) => {
     const result = await db.query(`
-      SELECT c.*, t.name as template_name
+      SELECT c.*, t.name as template_name, ea.name as email_account_name, ea.email as from_email
       FROM campaigns c
       LEFT JOIN templates t ON c.template_id = t.id
+      LEFT JOIN email_accounts ea ON c.email_account_id = ea.id
       ORDER BY c.created_at DESC
     `);
     return result.rows;
@@ -18,9 +19,10 @@ async function routes(fastify, options) {
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params;
     const result = await db.query(`
-      SELECT c.*, t.name as template_name, t.subject, t.body
+      SELECT c.*, t.name as template_name, t.subject, t.body, ea.name as email_account_name, ea.email as from_email
       FROM campaigns c
       LEFT JOIN templates t ON c.template_id = t.id
+      LEFT JOIN email_accounts ea ON c.email_account_id = ea.id
       WHERE c.id = $1
     `, [id]);
 
@@ -32,7 +34,7 @@ async function routes(fastify, options) {
 
   // Create campaign
   fastify.post('/', async (request, reply) => {
-    const { name, template_id, contact_ids } = request.body;
+    const { name, template_id, contact_ids, email_account_id } = request.body;
 
     const client = await db.pool.connect();
     try {
@@ -40,9 +42,9 @@ async function routes(fastify, options) {
 
       // Create campaign
       const campaignResult = await client.query(
-        `INSERT INTO campaigns (name, template_id, total_recipients)
-         VALUES ($1, $2, $3) RETURNING *`,
-        [name, template_id, contact_ids?.length || 0]
+        `INSERT INTO campaigns (name, template_id, email_account_id, total_recipients)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [name, template_id, email_account_id || null, contact_ids?.length || 0]
       );
       const campaign = campaignResult.rows[0];
 
@@ -69,7 +71,7 @@ async function routes(fastify, options) {
   // Update campaign
   fastify.put('/:id', async (request, reply) => {
     const { id } = request.params;
-    const { name, template_id, contact_ids } = request.body;
+    const { name, template_id, contact_ids, email_account_id } = request.body;
 
     const client = await db.pool.connect();
     try {
@@ -77,9 +79,9 @@ async function routes(fastify, options) {
 
       // Update campaign
       await client.query(
-        `UPDATE campaigns SET name = $1, template_id = $2, total_recipients = $3, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $4`,
-        [name, template_id, contact_ids?.length || 0, id]
+        `UPDATE campaigns SET name = $1, template_id = $2, email_account_id = $3, total_recipients = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5`,
+        [name, template_id, email_account_id || null, contact_ids?.length || 0, id]
       );
 
       // Update recipients
@@ -120,6 +122,7 @@ async function routes(fastify, options) {
       FROM campaign_recipients cr
       JOIN contacts c ON cr.contact_id = c.id
       WHERE cr.campaign_id = $1
+      ORDER BY cr.sent_at DESC NULLS LAST
     `, [id]);
     return result.rows;
   });
@@ -127,6 +130,7 @@ async function routes(fastify, options) {
   // Send campaign
   fastify.post('/:id/send', async (request, reply) => {
     const { id } = request.params;
+    const { email_account_id } = request.body || {};
 
     // Get campaign with template
     const campaignResult = await db.query(`
@@ -146,6 +150,32 @@ async function routes(fastify, options) {
       return reply.code(400).send({ error: 'Campaign has no template assigned' });
     }
 
+    // Get email account (use provided, campaign default, or system default)
+    const accountId = email_account_id || campaign.email_account_id;
+    let emailAccount = null;
+
+    if (accountId) {
+      const accountResult = await db.query('SELECT * FROM email_accounts WHERE id = $1', [accountId]);
+      if (accountResult.rows.length > 0) {
+        emailAccount = accountResult.rows[0];
+      }
+    } else {
+      // Try to get default account
+      const defaultResult = await db.query('SELECT * FROM email_accounts WHERE is_default = true LIMIT 1');
+      if (defaultResult.rows.length > 0) {
+        emailAccount = defaultResult.rows[0];
+      }
+    }
+
+    if (!emailAccount && !process.env.SMTP_HOST) {
+      return reply.code(400).send({ error: 'No email account selected and no default SMTP configured' });
+    }
+
+    // Update campaign with email account
+    if (emailAccount) {
+      await db.query('UPDATE campaigns SET email_account_id = $1 WHERE id = $2', [emailAccount.id, id]);
+    }
+
     // Update status to sending
     await db.query(
       `UPDATE campaigns SET status = 'sending', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
@@ -163,17 +193,18 @@ async function routes(fastify, options) {
     const template = { subject: campaign.subject, body: campaign.body };
 
     // Send emails in background
-    emailService.sendBulkEmails(recipientsResult.rows, template, db, id)
+    emailService.sendBulkEmails(recipientsResult.rows, template, db, id, emailAccount)
       .catch(err => console.error('Error sending bulk emails:', err));
 
     return {
       success: true,
       message: `Sending emails to ${recipientsResult.rows.length} recipients`,
-      recipientCount: recipientsResult.rows.length
+      recipientCount: recipientsResult.rows.length,
+      emailAccount: emailAccount ? { id: emailAccount.id, name: emailAccount.name, email: emailAccount.email } : null
     };
   });
 
-  // Get campaign stats
+  // Get campaign stats (real-time)
   fastify.get('/:id/stats', async (request, reply) => {
     const { id } = request.params;
     const result = await db.query(`
@@ -187,7 +218,60 @@ async function routes(fastify, options) {
       FROM campaign_recipients
       WHERE campaign_id = $1
     `, [id]);
-    return result.rows[0];
+
+    // Get campaign status
+    const campaignResult = await db.query('SELECT status FROM campaigns WHERE id = $1', [id]);
+    const campaignStatus = campaignResult.rows[0]?.status || 'draft';
+
+    return {
+      ...result.rows[0],
+      campaign_status: campaignStatus,
+      is_complete: campaignStatus === 'sent' || campaignStatus === 'draft'
+    };
+  });
+
+  // Get live sending progress
+  fastify.get('/:id/progress', async (request, reply) => {
+    const { id } = request.params;
+
+    // Get campaign status
+    const campaignResult = await db.query(`
+      SELECT c.status, c.sent_count, c.failed_count, c.total_recipients, ea.name as email_account_name
+      FROM campaigns c
+      LEFT JOIN email_accounts ea ON c.email_account_id = ea.id
+      WHERE c.id = $1
+    `, [id]);
+
+    if (campaignResult.rows.length === 0) {
+      return reply.code(404).send({ error: 'Campaign not found' });
+    }
+
+    const campaign = campaignResult.rows[0];
+
+    // Get recent recipient updates
+    const recentResult = await db.query(`
+      SELECT cr.status, cr.sent_at, cr.error_message, c.email, c.first_name, c.last_name
+      FROM campaign_recipients cr
+      JOIN contacts c ON cr.contact_id = c.id
+      WHERE cr.campaign_id = $1 AND cr.status != 'pending'
+      ORDER BY cr.sent_at DESC
+      LIMIT 20
+    `, [id]);
+
+    const processed = campaign.sent_count + campaign.failed_count;
+    const progress = campaign.total_recipients > 0 ? Math.round((processed / campaign.total_recipients) * 100) : 0;
+
+    return {
+      status: campaign.status,
+      email_account: campaign.email_account_name,
+      total: campaign.total_recipients,
+      sent: campaign.sent_count,
+      failed: campaign.failed_count,
+      pending: campaign.total_recipients - processed,
+      progress,
+      is_complete: campaign.status === 'sent',
+      recent_recipients: recentResult.rows
+    };
   });
 }
 

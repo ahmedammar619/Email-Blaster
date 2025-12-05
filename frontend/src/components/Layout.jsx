@@ -7,7 +7,8 @@ import {
   Mail,
   Settings,
   Menu,
-  X
+  X,
+  AtSign
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -16,6 +17,7 @@ const navigation = [
   { name: 'Campaigns', href: '/campaigns', icon: Send },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Templates', href: '/templates', icon: FileText },
+  { name: 'Email Accounts', href: '/email-accounts', icon: AtSign },
   { name: 'Email Logs', href: '/logs', icon: Mail },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

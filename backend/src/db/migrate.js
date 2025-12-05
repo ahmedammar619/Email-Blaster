@@ -108,6 +108,52 @@ const migrate = async () => {
     `);
     console.log('Created email_logs table');
 
+    // Create email_accounts table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS email_accounts (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        smtp_host VARCHAR(255) NOT NULL,
+        smtp_port INTEGER NOT NULL DEFAULT 587,
+        smtp_user VARCHAR(255) NOT NULL,
+        smtp_pass VARCHAR(255) NOT NULL,
+        smtp_secure BOOLEAN DEFAULT false,
+        is_default BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Created email_accounts table');
+
+    // Add email_account_id to campaigns table if not exists
+    await db.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'campaigns' AND column_name = 'email_account_id'
+        ) THEN
+          ALTER TABLE campaigns ADD COLUMN email_account_id INTEGER REFERENCES email_accounts(id);
+        END IF;
+      END $$;
+    `);
+    console.log('Added email_account_id to campaigns table');
+
+    // Add email_account_id to email_logs table if not exists
+    await db.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'email_logs' AND column_name = 'email_account_id'
+        ) THEN
+          ALTER TABLE email_logs ADD COLUMN email_account_id INTEGER REFERENCES email_accounts(id);
+        END IF;
+      END $$;
+    `);
+    console.log('Added email_account_id to email_logs table');
+
     console.log('All migrations completed successfully!');
     process.exit(0);
   } catch (error) {

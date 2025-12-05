@@ -2,7 +2,8 @@ const nodemailer = require('nodemailer');
 
 class EmailService {
   constructor() {
-    this.transporter = nodemailer.createTransport({
+    // Default transporter from env (fallback)
+    this.defaultTransporter = process.env.SMTP_HOST ? nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === 'true',
@@ -10,12 +11,28 @@ class EmailService {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
       }
+    }) : null;
+  }
+
+  createTransporter(account) {
+    return nodemailer.createTransport({
+      host: account.smtp_host,
+      port: account.smtp_port,
+      secure: account.smtp_secure,
+      auth: {
+        user: account.smtp_user,
+        pass: account.smtp_pass
+      }
     });
   }
 
-  async verifyConnection() {
+  async verifyConnection(account) {
     try {
-      await this.transporter.verify();
+      const transporter = account ? this.createTransporter(account) : this.defaultTransporter;
+      if (!transporter) {
+        return { success: false, message: 'No SMTP configuration available' };
+      }
+      await transporter.verify();
       return { success: true, message: 'SMTP connection verified' };
     } catch (error) {
       return { success: false, message: error.message };
@@ -39,23 +56,31 @@ class EmailService {
     return result;
   }
 
-  async sendEmail({ to, subject, html, from }) {
+  async sendEmail({ to, subject, html, from, account }) {
+    const transporter = account ? this.createTransporter(account) : this.defaultTransporter;
+
+    if (!transporter) {
+      return { success: false, error: 'No SMTP configuration available' };
+    }
+
+    const fromAddress = from || (account ? account.email : process.env.SMTP_FROM || process.env.SMTP_USER);
+
     const mailOptions = {
-      from: from || process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: fromAddress,
       to,
       subject,
       html
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const info = await transporter.sendMail(mailOptions);
       return { success: true, messageId: info.messageId };
     } catch (error) {
       return { success: false, error: error.message };
     }
   }
 
-  async sendBulkEmails(recipients, template, db, campaignId) {
+  async sendBulkEmails(recipients, template, db, campaignId, emailAccount) {
     const results = {
       sent: 0,
       failed: 0,
@@ -69,14 +94,15 @@ class EmailService {
       const result = await this.sendEmail({
         to: contact.email,
         subject,
-        html
+        html,
+        account: emailAccount
       });
 
       // Log the email
       await db.query(
-        `INSERT INTO email_logs (campaign_id, contact_id, to_email, subject, status, error_message)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [campaignId, contact.id, contact.email, subject, result.success ? 'sent' : 'failed', result.error || null]
+        `INSERT INTO email_logs (campaign_id, contact_id, to_email, subject, status, error_message, email_account_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [campaignId, contact.id, contact.email, subject, result.success ? 'sent' : 'failed', result.error || null, emailAccount?.id || null]
       );
 
       // Update campaign recipient status
