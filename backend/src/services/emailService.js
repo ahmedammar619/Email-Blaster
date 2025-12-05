@@ -39,12 +39,25 @@ class EmailService {
     }
   }
 
+  // Generate unsubscribe token (base64 encoded email)
+  generateUnsubscribeToken(email) {
+    return Buffer.from(email).toString('base64');
+  }
+
+  // Generate unsubscribe URL
+  getUnsubscribeUrl(email) {
+    const apiUrl = process.env.API_URL || 'http://localhost:3000';
+    const token = this.generateUnsubscribeToken(email);
+    return `${apiUrl}/unsubscribe/${token}`;
+  }
+
   replaceVariables(template, contact) {
     let result = template;
     result = result.replace(/{{firstName}}/g, contact.first_name || '');
     result = result.replace(/{{lastName}}/g, contact.last_name || '');
     result = result.replace(/{{email}}/g, contact.email || '');
     result = result.replace(/{{company}}/g, contact.company || '');
+    result = result.replace(/{{unsubscribeUrl}}/g, this.getUnsubscribeUrl(contact.email));
 
     // Replace any custom metadata variables
     if (contact.metadata) {
@@ -67,7 +80,11 @@ class EmailService {
         footer: '',
         bodyBgColor: '#f5f7fa',
         contentBgColor: '#ffffff',
-        accentColor: '#1a73e8'
+        accentColor: '#1a73e8',
+        contentWidth: '550',
+        contentPadding: '30',
+        contentBorderRadius: '8',
+        contentMargin: '20'
       };
 
       result.rows.forEach(row => {
@@ -76,17 +93,44 @@ class EmailService {
         if (row.setting_key === 'body_background_color') settings.bodyBgColor = row.setting_value || '#f5f7fa';
         if (row.setting_key === 'content_background_color') settings.contentBgColor = row.setting_value || '#ffffff';
         if (row.setting_key === 'accent_color') settings.accentColor = row.setting_value || '#1a73e8';
+        if (row.setting_key === 'content_width') settings.contentWidth = row.setting_value || '550';
+        if (row.setting_key === 'content_padding') settings.contentPadding = row.setting_value || '30';
+        if (row.setting_key === 'content_border_radius') settings.contentBorderRadius = row.setting_value || '8';
+        if (row.setting_key === 'content_margin') settings.contentMargin = row.setting_value || '20';
       });
 
       return settings;
     } catch (error) {
       console.error('Error fetching email settings:', error);
-      return { header: '', footer: '', bodyBgColor: '#f5f7fa', contentBgColor: '#ffffff', accentColor: '#1a73e8' };
+      return {
+        header: '',
+        footer: '',
+        bodyBgColor: '#f5f7fa',
+        contentBgColor: '#ffffff',
+        accentColor: '#1a73e8',
+        contentWidth: '550',
+        contentPadding: '30',
+        contentBorderRadius: '8',
+        contentMargin: '20'
+      };
     }
   }
 
-  wrapWithSettings(body, settings) {
-    const { header, footer, bodyBgColor, contentBgColor } = settings;
+  wrapWithSettings(body, settings, unsubscribeUrl) {
+    const { header, footer, bodyBgColor, contentBgColor, accentColor, contentWidth, contentPadding, contentBorderRadius, contentMargin } = settings;
+
+    // Add unsubscribe link to footer if not already present
+    let finalFooter = footer;
+    if (!footer.includes('unsubscribe') && !footer.includes('Unsubscribe')) {
+      finalFooter = `${footer}
+        <table role="presentation" width="${contentWidth}" cellpadding="0" cellspacing="0" style="margin-top: 10px;">
+          <tr>
+            <td align="center" style="padding: 15px 0; font-size: 12px; color: #666;">
+              <a href="${unsubscribeUrl}" style="color: ${accentColor}; text-decoration: underline;">Unsubscribe</a> from this mailing list
+            </td>
+          </tr>
+        </table>`;
+    }
 
     return `
 <!DOCTYPE html>
@@ -98,16 +142,16 @@ class EmailService {
 <body style="margin: 0; padding: 0; background-color: ${bodyBgColor};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${bodyBgColor};">
     <tr>
-      <td align="center" style="padding: 20px 0;">
+      <td align="center" style="padding: ${contentMargin}px 0;">
         ${header}
-        <table role="presentation" width="550" cellpadding="0" cellspacing="0" style="background-color: ${contentBgColor}; border-radius: 8px;">
+        <table role="presentation" width="${contentWidth}" cellpadding="0" cellspacing="0" style="background-color: ${contentBgColor}; border-radius: ${contentBorderRadius}px;">
           <tr>
-            <td style="padding: 30px;">
+            <td style="padding: ${contentPadding}px;">
               ${body}
             </td>
           </tr>
         </table>
-        ${footer}
+        ${finalFooter}
       </td>
     </tr>
   </table>
@@ -128,7 +172,10 @@ class EmailService {
       from: fromAddress,
       to,
       subject,
-      html
+      html,
+      headers: {
+        'List-Unsubscribe': `<${this.getUnsubscribeUrl(to)}>`
+      }
     };
 
     try {
@@ -152,9 +199,10 @@ class EmailService {
     for (const contact of recipients) {
       const subject = this.replaceVariables(template.subject, contact);
       let body = this.replaceVariables(template.body, contact);
+      const unsubscribeUrl = this.getUnsubscribeUrl(contact.email);
 
       // Wrap with header, footer, and background colors
-      const html = this.wrapWithSettings(body, emailSettings);
+      const html = this.wrapWithSettings(body, emailSettings, unsubscribeUrl);
 
       const result = await this.sendEmail({
         to: contact.email,
@@ -185,17 +233,24 @@ class EmailService {
         results.errors.push({ email: contact.email, error: result.error });
       }
 
+      // Update campaign stats in real-time
+      await db.query(
+        `UPDATE campaigns
+         SET sent_count = $1, failed_count = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [results.sent, results.failed, campaignId]
+      );
+
       // Small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Update campaign stats
+    // Mark campaign as sent
     await db.query(
       `UPDATE campaigns
-       SET sent_count = sent_count + $1, failed_count = failed_count + $2,
-           status = 'sent', sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [results.sent, results.failed, campaignId]
+       SET status = 'sent', sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [campaignId]
     );
 
     return results;

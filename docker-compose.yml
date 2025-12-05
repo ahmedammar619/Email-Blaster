@@ -9,7 +9,10 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
-      - FRONTEND_URL=http://localhost:5173
+      - APP_URL=${APP_URL:-http://localhost:5173}
+      - API_URL=${API_URL:-http://localhost:3000}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
     ports:
       - "3000:3000"
     volumes:
@@ -23,7 +26,9 @@ services:
       dockerfile: Dockerfile
     container_name: email-blaster-frontend
     environment:
-      - VITE_API_URL=http://localhost:3000/api
+      - VITE_API_URL=${API_URL:-http://localhost:3000}/api
+      - VITE_APP_URL=${APP_URL:-http://localhost:5173}
+      - CHOKIDAR_USEPOLLING=true
     ports:
       - "5173:5173"
     depends_on:

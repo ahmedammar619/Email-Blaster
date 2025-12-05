@@ -600,7 +600,7 @@ export default function Settings() {
           <p className="text-gray-600 mb-4">
             Use these variables in your email templates for personalization:
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-gray-50 p-3 rounded-lg text-center">
               <code className="text-indigo-600">{"{{firstName}}"}</code>
               <p className="text-sm text-gray-500 mt-1">First name</p>
@@ -617,7 +617,14 @@ export default function Settings() {
               <code className="text-indigo-600">{"{{company}}"}</code>
               <p className="text-sm text-gray-500 mt-1">Company name</p>
             </div>
+            <div className="bg-gray-50 p-3 rounded-lg text-center">
+              <code className="text-indigo-600 text-xs">{"{{unsubscribeUrl}}"}</code>
+              <p className="text-sm text-gray-500 mt-1">Unsubscribe link</p>
+            </div>
           </div>
+          <p className="text-sm text-gray-500 mt-3">
+            Note: An unsubscribe link is automatically added to emails if not present in your footer.
+          </p>
         </div>
       </div>
 
