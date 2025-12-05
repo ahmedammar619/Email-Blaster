@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Send,
@@ -9,9 +9,11 @@ import {
   Menu,
   X,
   AtSign,
-  Code
+  Code,
+  LogOut
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -25,6 +27,13 @@ const navigation = [
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -37,16 +46,16 @@ export default function Layout() {
       )}
 
       {/* Mobile sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-indigo-700 transform transition-transform duration-300 ease-in-out lg:hidden ${
+      <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-indigo-700 transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="flex items-center justify-between h-16 px-4">
+        <div className="flex items-center justify-between h-16 px-4 flex-shrink-0">
           <span className="text-xl font-bold text-white">Email Blaster</span>
           <button onClick={() => setSidebarOpen(false)} className="text-white">
             <X className="h-6 w-6" />
           </button>
         </div>
-        <nav className="mt-4 px-2 space-y-1">
+        <nav className="mt-4 px-2 space-y-1 flex-1">
           {navigation.map((item) => (
             <NavLink
               key={item.name}
@@ -65,6 +74,18 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <div className="px-2 pb-4">
+          <div className="px-4 py-2 text-xs text-indigo-300 truncate">
+            {user?.username}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg text-indigo-100 hover:bg-indigo-600 transition-colors"
+          >
+            <LogOut className="h-5 w-5 mr-3" />
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Desktop sidebar */}
@@ -92,6 +113,18 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
+          <div className="px-2 pb-4">
+            <div className="px-4 py-2 text-xs text-indigo-300 truncate">
+              {user?.username}
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg text-indigo-100 hover:bg-indigo-600 transition-colors"
+            >
+              <LogOut className="h-5 w-5 mr-3" />
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 

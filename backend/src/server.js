@@ -9,12 +9,19 @@ if (!process.env.DATABASE_URL) {
 }
 
 const db = require('./db');
+const authRoutes = require('./routes/auth');
 const campaignRoutes = require('./routes/campaigns');
 const contactRoutes = require('./routes/contacts');
 const emailRoutes = require('./routes/emails');
 const templateRoutes = require('./routes/templates');
 const emailAccountRoutes = require('./routes/emailAccounts');
 const emailSettingsRoutes = require('./routes/emailSettings');
+
+// Shared token store for auth
+const authTokens = new Map();
+
+// Token expiration: 3 days in milliseconds
+const TOKEN_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
 
 // Parse allowed origins from environment
 const getAllowedOrigins = () => {
@@ -58,14 +65,49 @@ const start = async () => {
 
     // Register database
     fastify.decorate('db', db);
+    fastify.decorate('authTokens', authTokens);
 
-    // Register routes
-    await fastify.register(campaignRoutes, { prefix: '/api/campaigns' });
-    await fastify.register(contactRoutes, { prefix: '/api/contacts' });
-    await fastify.register(emailRoutes, { prefix: '/api/emails' });
-    await fastify.register(templateRoutes, { prefix: '/api/templates' });
-    await fastify.register(emailAccountRoutes, { prefix: '/api/email-accounts' });
-    await fastify.register(emailSettingsRoutes, { prefix: '/api/email-settings' });
+    // Auth middleware
+    const authenticate = async (request, reply) => {
+      const authHeader = request.headers.authorization;
+
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.code(401).send({ error: 'Authentication required' });
+      }
+
+      const token = authHeader.substring(7);
+      const session = authTokens.get(token);
+
+      if (!session) {
+        return reply.code(401).send({ error: 'Invalid or expired token' });
+      }
+
+      // Check if token has expired (3 days)
+      if (Date.now() - session.createdAt > TOKEN_EXPIRY_MS) {
+        authTokens.delete(token);
+        return reply.code(401).send({ error: 'Token expired. Please login again.' });
+      }
+
+      request.user = {
+        id: session.userId,
+        username: session.username
+      };
+    };
+
+    // Register public auth routes
+    await fastify.register(authRoutes, { prefix: '/api/auth' });
+
+    // Register protected routes with auth middleware
+    await fastify.register(async (protectedRoutes) => {
+      protectedRoutes.addHook('preHandler', authenticate);
+
+      await protectedRoutes.register(campaignRoutes, { prefix: '/campaigns' });
+      await protectedRoutes.register(contactRoutes, { prefix: '/contacts' });
+      await protectedRoutes.register(emailRoutes, { prefix: '/emails' });
+      await protectedRoutes.register(templateRoutes, { prefix: '/templates' });
+      await protectedRoutes.register(emailAccountRoutes, { prefix: '/email-accounts' });
+      await protectedRoutes.register(emailSettingsRoutes, { prefix: '/email-settings' });
+    }, { prefix: '/api' });
 
     // Public unsubscribe endpoint (no auth required)
     fastify.get('/unsubscribe/:token', async (request, reply) => {

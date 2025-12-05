@@ -1,10 +1,16 @@
 const path = require('path');
+const crypto = require('crypto');
 // Load .env from backend folder (works in production) or parent folder (works in local dev)
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 if (!process.env.DATABASE_URL) {
   require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 }
 const db = require('./index');
+
+// Simple password hashing
+const hashPassword = (password) => {
+  return crypto.createHash('sha256').update(password).digest('hex');
+};
 
 const migrate = async () => {
   try {
@@ -211,6 +217,27 @@ const migrate = async () => {
       ON CONFLICT (setting_key) DO NOTHING
     `);
     console.log('Inserted default email header and footer');
+
+    // Create users table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Created users table');
+
+    // Seed admin user if not exists
+    const adminPassword = hashPassword('12121313');
+    await db.query(`
+      INSERT INTO users (username, password)
+      VALUES ('admin', $1)
+      ON CONFLICT (username) DO NOTHING
+    `, [adminPassword]);
+    console.log('Seeded admin user');
 
     console.log('All migrations completed successfully!');
     process.exit(0);
